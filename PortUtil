@@ -1,0 +1,508 @@
+/*
+ * （C）2018 用友网络科技股份有限公司. yonyou Group, All right reserved.
+ *
+ * 项目名称 : PortProAPI
+ * 创建日期 : 2019年7月5日
+ */
+package com.port.process;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Field;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.httpclient.ConnectionPoolTimeoutException;
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.UsernamePasswordCredentials;
+import org.apache.commons.httpclient.auth.AuthScope;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.RequestEntity;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.apache.http.HttpResponse;
+import org.apache.http.HttpStatus;
+import org.apache.http.client.methods.HttpPatch;
+import org.apache.http.entity.StringEntity;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.protocol.HTTP;
+import org.apache.http.util.EntityUtils;
+
+
+/**
+ * 添加类/接口功能描述
+ * 
+ * @author wuxh1 2019年7月5日 上午11:01:08
+ * @version 1.0.0
+ *
+ *          修改信息说明：
+ * @updateDescription
+ * @updateAuthor
+ * @updateDate
+ */
+public class PortUtil {
+	// 辨识类型
+	String[] types1 = { "int", "java.lang.String", "boolean", "char", "float", "double", "short", "byte" };
+
+	private static volatile PortUtil PORTUTIL;
+
+	/**
+	 * 
+	 * @Description : 自动初始化单例模式
+	 * @file_name : SendUtil.java
+	 * @date : 2019年4月28日
+	 * @return : SendUtil
+	 * @return
+	 */
+	public static PortUtil getInstance() {
+
+		if (PORTUTIL == null) {
+
+			synchronized (PortUtil.class) {
+				if (PORTUTIL == null) {
+
+					PORTUTIL = new PortUtil();
+
+				}
+			}
+
+		}
+
+		return PORTUTIL;
+
+	}
+
+	/**
+	 * 
+	 * @Description : GET请求
+	 * @file_name : SendUtil.java
+	 * @date : 2019年6月11日
+	 * @return : String
+	 * @param httpurl
+	 * @return
+	 */
+	public String doGet(String httpurl) {
+		HttpURLConnection connection = null;
+		InputStream is = null;
+		BufferedReader br = null;
+		String result = null;// 返回结果字符串
+		try {
+			// 创建远程url连接对象
+			URL url = new URL(httpurl);
+			// 通过远程url连接对象打开一个连接，强转成httpURLConnection类
+			connection = (HttpURLConnection) url.openConnection();
+			// 设置连接方式：get
+			connection.setRequestMethod("GET");
+			// 设置连接主机服务器的超时时间：15000毫秒
+			connection.setConnectTimeout(15000);
+			// 设置读取远程返回的数据时间：60000毫秒
+			connection.setReadTimeout(60000);
+			// 发送请求
+			connection.connect();
+			// 通过connection连接，获取输入流
+			if (connection.getResponseCode() == 200) {
+				is = connection.getInputStream();
+				// 封装输入流is，并指定字符集
+				br = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+				// 存放数据
+				StringBuffer sbf = new StringBuffer();
+				String temp = null;
+				while ((temp = br.readLine()) != null) {
+					sbf.append(temp);
+					sbf.append("\r\n");
+				}
+				result = sbf.toString();
+			}
+		} catch (MalformedURLException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			// 关闭资源
+			if (null != br) {
+				try {
+					br.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+
+			if (null != is) {
+				try {
+					is.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+
+			connection.disconnect();// 关闭远程连接
+		}
+
+		return result;
+	}
+
+	/**
+	 * 
+	 * @Description :PATCH请求
+	 * @file_name : SendUtil.java
+	 * @date : 2019年6月11日
+	 * @return : JSONObject
+	 * @param path
+	 * @param jsonParam
+	 * @return
+	 * @throws Exception
+	 * @throws BusinessException
+	 */
+	public String doPatch(String path, String jsonParam) throws Exception {
+		// 接收返回结果
+		String resultObj = null;
+		try {
+
+			DefaultHttpClient httpClient = new DefaultHttpClient();
+
+			HttpPatch httpPatch = new HttpPatch(path);
+			// 设置头部通用信息
+			httpPatch.setHeader("Content-type", "application/json");
+			httpPatch.setHeader("Accept", "*/*");
+			httpPatch.setHeader("Charset", HTTP.UTF_8);
+			httpPatch.setHeader("Accept-Charset", HTTP.UTF_8);
+			// 设置Body数据
+			StringEntity entity = new StringEntity(jsonParam, HTTP.UTF_8);
+			httpPatch.setEntity(entity);
+			// 开启连接
+			HttpResponse response = httpClient.execute(httpPatch);
+			// 返回结果 200为成功
+			int statusCode = response.getStatusLine().getStatusCode();
+
+			switch (statusCode) {
+			case HttpStatus.SC_OK:
+				// 状态为200 获取输出信息
+				resultObj = EntityUtils.toString(response.getEntity());
+				break;
+			case HttpStatus.SC_METHOD_FAILURE:// 调用方法失败
+				resultObj = "调用方法失败";
+				break;
+			default:
+				resultObj = null;
+				break;
+			}
+
+		} catch (Exception e) {
+
+			throw new Exception(e.getMessage());
+
+		} finally {
+
+		}
+
+		return resultObj;
+
+	}
+
+	/**
+	 * 
+	 * @Description : POST接口调用--设置账号，密码，超时时间
+	 * @file_name : SendUtil.java
+	 * @date : 2019年4月26日
+	 * @return : String 返回信息
+	 * @param url
+	 *            接口地址
+	 * @param username
+	 *            账号
+	 * @param password
+	 *            密码
+	 * @param xml
+	 *            报文
+	 * @param realm
+	 *            接口方式
+	 * @param timeout
+	 *            超时时间设置
+	 * @throws BusinessException
+	 *             自定义异常
+	 * @throws UnsupportedEncodingException
+	 *             转码异常
+	 */
+	public String post(String url, String username, String password, String xml, String realm, int timeout)
+			throws Exception {
+		// GetMethod postMethod = new GetMethod(url);
+		// 建立关联
+		PostMethod postMethod = new PostMethod(url);
+		// 设置参数
+		postMethod.addRequestHeader("Connection", "Keep-Alive");
+		postMethod.addRequestHeader("Content-Type", "text/xml;charset=UTF-8");
+		postMethod.setDoAuthentication(true);
+		RequestEntity requestEntity = new StringRequestEntity(xml, "text/xml;", "UTF-8");
+		// 设置传入实体
+		postMethod.setRequestEntity(requestEntity);
+		// 建立连接
+		HttpClient client = new HttpClient();
+		// 获得接口信息（域名，端口，协议）
+		Map urlMap = convertUrl(url);
+		// 设置接口调用信息
+		client.getHostConfiguration().setHost((String) urlMap.get("host"),
+				Integer.valueOf((String) urlMap.get("port")).intValue(), (String) urlMap.get("protocol"));
+
+		client.getParams().setAuthenticationPreemptive(true);
+		client.getState()
+				.setCredentials(
+						new AuthScope((String) urlMap.get("host"),
+								Integer.valueOf((String) urlMap.get("port")).intValue(), realm, "BASIC"),
+						new UsernamePasswordCredentials(username, password));
+
+		client.getHttpConnectionManager().getParams().setConnectionTimeout(timeout);
+		client.getHttpConnectionManager().getParams().setSoTimeout(timeout);
+		client.getParams().setParameter("http.protocol.content-charset", "UTF-8");
+
+		String responseStr = null;
+		BufferedReader br = null;
+		try {
+			// 执行请求
+			client.executeMethod(postMethod);
+			// 获得接口返回信息
+			int statuscode = postMethod.getStatusCode();
+			// 判断返回状态是否为200
+			if (statuscode == 200) {
+				// 获取返回结果
+				br = new BufferedReader(new InputStreamReader(postMethod.getResponseBodyAsStream(), "UTF-8"));
+				String line = null;
+				StringBuffer sb = new StringBuffer();
+				try {
+
+					while ((line = br.readLine()) != null) {
+
+						sb.append(line).append("\n");
+
+					}
+					responseStr = sb.toString();
+
+				} finally {
+
+					br.close();
+
+				}
+			} else {
+
+				throw new Exception(String.valueOf(statuscode));
+
+			}
+		} catch (ConnectionPoolTimeoutException e) {
+
+			throw new Exception("服务器请求连接超时:" + e.getMessage());
+
+		} catch (SocketTimeoutException e) {
+
+			throw new Exception("服务器响应连接超时:" + e.getMessage());
+
+		} catch (HttpException e) {
+
+			throw new Exception("调用接口失败 :" + e.getMessage());
+
+		} catch (IOException e) {
+
+			throw new Exception(e.getMessage());
+
+		} finally {
+
+			if (postMethod != null) {
+
+				postMethod.releaseConnection();
+				postMethod = null;
+
+			}
+			if (br != null) {
+
+				br = null;
+
+			}
+
+		}
+		return responseStr;
+	}
+
+	/**
+	 * 
+	 * @Description : 拆分URL，获取接口信息
+	 * @file_name : SendUtil.java
+	 * @date : 2019年4月26日
+	 * @return : Map<String,String>
+	 * @param url
+	 *            接口地址
+	 * @return
+	 */
+	private Map<String, String> convertUrl(String url) {
+		Map urlMap = new HashMap();
+
+		if (url != null && url.length() > 0) {
+			String[] urlStrs = url.split("://");
+			String[] secPartStrs = null;
+			if (urlStrs != null && urlStrs.length > 1) {
+
+				urlMap.put("protocol", urlStrs[0]);// 设置协议
+				String secPartStr = urlStrs[1];
+				secPartStrs = secPartStr.split(":");
+
+			} else {
+
+				urlMap.put("protocol", "http");// 默认为Http协议
+				secPartStrs = url.split(":");
+
+			}
+			String[] thirdPartStrs = null;
+
+			if (secPartStrs != null && secPartStrs.length > 1) {
+
+				urlMap.put("host", secPartStrs[0]);// 设置域名
+				thirdPartStrs = secPartStrs[1].split("/", 2);
+				urlMap.put("port", thirdPartStrs[0]);// 设置端口
+				urlMap.put("service", "/" + thirdPartStrs[1]);
+
+			} else {
+
+				urlMap.put("port", "80");// 默认80端口
+				thirdPartStrs = secPartStrs[0].split("/", 2);
+				urlMap.put("port", thirdPartStrs[0]);// 设置端口
+				urlMap.put("service", "/" + thirdPartStrs[1]);
+
+			}
+
+		}
+
+		return urlMap;
+	}
+
+	/**
+	 * 
+	 * @Description : 发送请求
+	 * @file_name : SendUtil.java
+	 * @date : 2019年3月19日
+	 * @return : String
+	 * @param path
+	 *            发送请求地址
+	 * @param message
+	 *            发送请求报文
+	 * @param type
+	 *            请求类型
+	 * @return
+	 * @throws IOException
+	 *             流异常
+	 * @throws BusinessException
+	 *             自定义异常
+	 */
+	public String post(String path, String message) throws Exception {
+
+		BufferedReader reader = null;// 用于接收接口返回结果
+		String res = "";
+		HttpURLConnection connection = null;
+		OutputStreamWriter out = null;
+		try {
+			URL url = new URL(path);// 创建连接地址
+			connection = (HttpURLConnection) url.openConnection();// 建立与地址的连接
+			connection.setRequestMethod("POST");// 请求方式
+			connection.setDoOutput(true);
+			// 设置连接Headers
+
+				connection.setDoInput(true);
+				connection.setRequestProperty("Content-Type", "text/xml");
+				connection.setRequestProperty("Connection", "Keep-Alive");
+				connection.setRequestProperty("charset", "UTF-8");
+				connection.setRequestProperty("SOAPAction", "");
+
+
+			// 开启连接
+			connection.connect();
+			out = new OutputStreamWriter(connection.getOutputStream(), "UTF-8");
+
+			out.append(message);
+
+			out.flush();
+
+			out.close();
+
+			reader = new BufferedReader(new InputStreamReader(connection.getInputStream(), "UTF-8"));
+
+			String line;
+
+			while ((line = reader.readLine()) != null) {
+
+				res += line;
+
+			}
+		} catch (Exception e) {
+
+			throw new Exception(e.getMessage());
+
+		} finally {
+			if (reader != null) {
+
+				reader.close();
+
+			}
+			if (connection != null) {
+
+				connection.disconnect();
+
+			}
+
+		}
+
+		return res;
+	}
+
+	/**
+	 * 
+	 * @Description : 实体类转为XML<key>value</key>
+	 * @file_name : DocumentUtil.java
+	 * @date : 2019年3月21日
+	 * @return : String
+	 * @param cls
+	 *            实体类转XML
+	 * @param isUpperCase 是否大写
+	 * @throws IllegalArgumentException
+	 *             java 非法参数异常
+	 * @throws IllegalAccessException
+	 *             java 非法访问异常
+	 */
+	public String classToXML(Object cls,boolean isUpperCase ) throws IllegalArgumentException, IllegalAccessException {
+		String xml = "";
+		if (cls == null) {
+
+			return null;
+		}
+		Class cla = cls.getClass();
+		List<String> typeList = new ArrayList<String>();
+
+		typeList = Arrays.asList(types1);
+		Field[] fields = cla.getDeclaredFields();
+
+		for (Field field : fields) {
+			field.setAccessible(true);
+			if (typeList.contains(field.getType().getName())) {
+				if (field.get(cls) != null) {
+					String fileName = field.getName();
+					String value = (String) field.get(cls);
+					
+					if(isUpperCase){
+						fileName = fileName.toUpperCase();//全字母大写
+					}
+					String vaXML   = "<" + fileName + ">" + value + "</" + fileName + ">";
+					xml += vaXML;
+				}
+			}
+
+		}
+
+		return xml;
+
+	}
+}
